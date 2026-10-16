@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: helpora
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --timeout 120
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: True
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ADMIN_KEY
+        sync: false
