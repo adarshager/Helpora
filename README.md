@@ -1,7 +1,5 @@
 # Helpora - AI Customer Support Agent
-
-<<<<<<< HEAD
-A support chatbot that answers ONLY from a company knowledge base (RAG). When it cannot answer, or the customer
+chatbot that answers ONLY from a company knowledge base (RAG). When it cannot answer, or the customer
 asks for a person, it creates a **support ticket**, **alerts a human agent instantly** (Telegram / Slack / email),
 sends the customer a **confirmation email**, and gives the agent a **dashboard** to track status and reply.
 
@@ -29,7 +27,7 @@ does not know, and hands over to a human agent by creating a support ticket.
 2. Create and activate a virtual environment
    - Windows: `python -m venv .venv` then `.venv\Scripts\activate`
    - Mac/Linux: `python3 -m venv .venv` then `source .venv/bin/activate`
-<<<<<<< HEAD
+
 3. Install the packages: `pip install -r requirements.txt`
 4. Copy `.env.example` to a new file named `.env` (never upload `.env` to GitHub).
 5. In `.env`, set at least: `AGENT_PASSWORD=choose-a-strong-password`

@@ -2,136 +2,20 @@
 Retrieval : TF-IDF style keyword scoring over knowledge_base/*.md (Q:/A: pairs)
 AI mode   : Claude or Gemini write the answer from the retrieved passages (key in .env)
 Offline   : returns the best-matching FAQ answer, no key needed
-<<<<<<< HEAD
 Escalation: unanswered questions become support tickets (database), the agent is alerted
             (Telegram/Slack/email) and works them in the /agent dashboard."""
-import os, re, json, time, math, glob, uuid, functools, hashlib, hmac, threading, importlib, sqlite3
-from contextlib import contextmanager
+import os, re, json, time, math, glob, uuid, functools, hashlib, hmac, threading
 from datetime import datetime, timezone
-from types import SimpleNamespace
-from urllib import error as urlerror, parse as urlparse, request as urlrequest
-from flask import Flask, request, jsonify, render_template, session, redirect, url_for, abort  # pyright: ignore[reportMissingImports]
-try:
-    _sqlalchemy = importlib.import_module("sqlalchemy")
-    create_engine, text = _sqlalchemy.create_engine, _sqlalchemy.text
-except ImportError:
-    def text(sql):
-        return sql
-
-    class _SQLiteResult:
-        def __init__(self, cursor):
-            self.cursor = cursor
-
-        def mappings(self):
-            return self
-
-        def all(self):
-            return [dict(row) for row in self.cursor.fetchall()]
-
-        def first(self):
-            row = self.cursor.fetchone()
-            return dict(row) if row is not None else None
-
-    class _SQLiteConnection:
-        def __init__(self, connection):
-            self.connection = connection
-
-        def execute(self, sql, params=None):
-            return _SQLiteResult(self.connection.execute(sql, params or {}))
-
-    class _SQLiteEngine:
-        def __init__(self, url):
-            path = url[len("sqlite:///"):]
-            if os.name == "nt" and re.match(r"^/[A-Za-z]:", path):
-                path = path[1:]
-            self.path = path
-
-        @contextmanager
-        def _connection(self, transaction):
-            connection = sqlite3.connect(self.path)
-            connection.row_factory = sqlite3.Row
-            try:
-                yield _SQLiteConnection(connection)
-                if transaction:
-                    connection.commit()
-            except Exception:
-                if transaction:
-                    connection.rollback()
-                raise
-            finally:
-                connection.close()
-
-        def begin(self):
-            return self._connection(True)
-
-        def connect(self):
-            return self._connection(False)
-
-    def create_engine(url, **kwargs):
-        if not url.startswith("sqlite:///"):
-            raise RuntimeError("SQLAlchemy is required for non-SQLite DATABASE_URL values")
-        return _SQLiteEngine(url)
+import urllib.error, urllib.request
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for, abort
+from sqlalchemy import create_engine, text
 from notify import notify_new_ticket, send_email, email_ready
-try:
-    load_dotenv = importlib.import_module("dotenv").load_dotenv
-except ImportError:  # python-dotenv is optional in some environments
-    def load_dotenv(*args, **kwargs):
-        return False
-
-
-class _HTTPResponse:
-    def __init__(self, status, body):
-        self.status_code, self._body = status, body
-        self.ok = 200 <= status < 300
-
-    def json(self):
-        return json.loads(self._body.decode("utf-8"))
-
-    def raise_for_status(self):
-        if not self.ok:
-            raise RuntimeError(f"HTTP {self.status_code}")
-
-
-class _RequestException(Exception):
-    pass
-
-
-def _http_request(method, url, headers=None, params=None, timeout=None, json_body=None):
-    if params:
-        url += ("&" if "?" in url else "?") + urlparse.urlencode(params)
-    data = json.dumps(json_body).encode("utf-8") if json_body is not None else None
-    req = urlrequest.Request(url, data=data, headers=headers or {}, method=method)
-    try:
-        with urlrequest.urlopen(req, timeout=timeout) as response:
-            return _HTTPResponse(response.status, response.read())
-    except urlerror.HTTPError as exc:
-        return _HTTPResponse(exc.code, exc.read())
-    except urlerror.URLError as exc:
-        raise _RequestException(str(exc)) from exc
-
-
-requests = SimpleNamespace(
-    get=lambda url, **kwargs: _http_request("GET", url, **kwargs),
-    post=lambda url, **kwargs: _http_request("POST", url, json_body=kwargs.pop("json", None), **kwargs),
-    RequestException=_RequestException,
-)
-=======
-Escalation: unanswered questions can be sent to a human agent (support ticket)."""
-import os, re, json, time, math, glob, uuid, functools
-from datetime import datetime, timezone
-import requests
-from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
->>>>>>> dc31bff7ead649512dafebfa2281b97529237360
 
 load_dotenv()
 app = Flask(__name__)
 BASE = os.path.dirname(os.path.abspath(__file__))
 COMPANY = "ShopEase"
-<<<<<<< HEAD
-=======
-TICKETS = os.getenv("TICKETS_FILE", os.path.join(BASE, "tickets.json"))
->>>>>>> dc31bff7ead649512dafebfa2281b97529237360
 NOT_FOUND = "I couldn't find this information. Would you like me to connect you with a support agent?"
 STOP = set("a an the is are was were be been to of in on at for and or my your i me we you it its do does did can "
            "could would will how what when where which who why with this that there any about please tell want need "
@@ -220,6 +104,34 @@ _GEMINI = "https://generativelanguage.googleapis.com/v1beta/"
 _model_cache = []
 
 
+class _HTTPResponse:
+    def __init__(self, status, body):
+        self.status_code = status
+        self._body = body
+        self.ok = 200 <= status < 300
+
+    def json(self):
+        return json.loads(self._body)
+
+    def raise_for_status(self):
+        if not self.ok:
+            raise RuntimeError(f"HTTP {self.status_code}: {self._body[:500]}")
+
+
+def _http(method, url, *, headers=None, params=None, timeout=30, payload=None):
+    if params:
+        from urllib.parse import urlencode
+        url += "&" if "?" in url else "?"
+        url += urlencode(params)
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return _HTTPResponse(response.status, response.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as error:
+        return _HTTPResponse(error.code, error.read().decode("utf-8", "replace"))
+
+
 def _err(r):
     try:
         return r.json()["error"]["message"]
@@ -235,7 +147,7 @@ def gemini(prompt):
     models = [os.getenv("GEMINI_MODEL", "").strip()]
     if not _model_cache:
         try:
-            r = requests.get(_GEMINI + "models", headers=h, params={"pageSize": 100}, timeout=10)
+            r = _http("GET", _GEMINI + "models", headers=h, params={"pageSize": 100}, timeout=10)
             if r.ok:
                 names = [m["name"].split("/")[-1] for m in r.json().get("models", [])
                          if "generateContent" in m.get("supportedGenerationMethods", [])]
@@ -243,7 +155,7 @@ def gemini(prompt):
                 _model_cache.extend(sorted(good, reverse=True)[:3])
             elif "key" in _err(r).lower():
                 raise RuntimeError(_err(r))
-        except requests.RequestException:
+        except urllib.error.URLError:
             pass
     models += _model_cache + ["gemini-2.5-flash", "gemini-flash-latest"]
     last = "No Gemini model available"
@@ -251,8 +163,8 @@ def gemini(prompt):
         for cfg in ({"responseMimeType": "application/json"}, {}):
             if time.monotonic() - t0 > 55:
                 raise RuntimeError("AI request timed out")
-            r = requests.post(_GEMINI + f"models/{m}:generateContent", headers=h, timeout=40,
-                              json={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": cfg})
+            r = _http("POST", _GEMINI + f"models/{m}:generateContent", headers=h, timeout=40,
+                      payload={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": cfg})
             if r.ok:
                 return r.json()["candidates"][0]["content"]["parts"][0]["text"]
             last = _err(r)
@@ -265,11 +177,11 @@ def gemini(prompt):
 
 def llm(prompt):
     if os.getenv("ANTHROPIC_API_KEY"):
-        r = requests.post("https://api.anthropic.com/v1/messages", timeout=60,
-                          headers={"x-api-key": os.getenv("ANTHROPIC_API_KEY").strip(),
-                                   "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                          json={"model": os.getenv("CLAUDE_MODEL", "claude-sonnet-5-5"), "max_tokens": 800,
-                                "messages": [{"role": "user", "content": prompt}]})
+        r = _http("POST", "https://api.anthropic.com/v1/messages", timeout=60,
+                headers={"x-api-key": os.getenv("ANTHROPIC_API_KEY").strip(),
+                       "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                payload={"model": os.getenv("CLAUDE_MODEL", "claude-sonnet-5-5"), "max_tokens": 800,
+                       "messages": [{"role": "user", "content": prompt}]})
         r.raise_for_status()
         return r.json()["content"][0]["text"]
     if os.getenv("GEMINI_API_KEY"):
@@ -342,7 +254,6 @@ def chat():
     return reply(out["answer"], out["found"], not out["found"], out["sources"], mode, err)
 
 
-<<<<<<< HEAD
 # ---------------------------------------------------------------- database, tickets and agent desk
 STATUSES = ("open", "in_progress", "resolved")
 app.jinja_env.globals.update(
@@ -416,15 +327,12 @@ def login_required(f):
     return wrapper
 
 
-=======
->>>>>>> dc31bff7ead649512dafebfa2281b97529237360
 @app.post("/api/escalate")
 def escalate():
     j = request.get_json(silent=True) or {}
     name, email = str(j.get("name", "")).strip()[:80], str(j.get("email", "")).strip()[:120]
     if not name or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
         return jsonify(error="Please enter your name and a valid email address."), 400
-<<<<<<< HEAD
     ip = (request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote_addr or "?")
     if limited(ip):
         return jsonify(error="Too many requests from this network. Please try again later."), 429
@@ -530,49 +438,11 @@ def agent_reply(tid):
                        "updated=:u WHERE id=:i"), {"u": utcnow(), "i": tid})
     msg = "Reply emailed to the customer." if ok else f"Reply saved, but not emailed ({info}). Contact the customer manually."
     return redirect(url_for("agent_ticket", tid=tid, msg=msg))
-=======
-    t = {"id": "TKT-" + uuid.uuid4().hex[:6].upper(), "name": name, "email": email, "topic": str(j.get("topic", "")).strip()[:200],
-         "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-         "transcript": [{"role": str(m.get("role"))[:10], "text": str(m.get("text"))[:500]}
-                        for m in (j.get("history") or [])[-20:] if isinstance(m, dict)]}
-    try:
-        data = []
-        if os.path.exists(TICKETS):
-            with open(TICKETS, encoding="utf-8") as fh:
-                data = json.load(fh)
-        data.append(t)
-        with open(TICKETS, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=1)
-    except Exception as e:
-        app.logger.warning("Could not save ticket: %s", e)
-    return jsonify(ticket=t["id"], message=f"Thanks {name}! Your request {t['id']} has been created. "
-                                           f"A support agent will contact you at {email} within 24 hours.")
-
-
-@app.get("/admin/tickets")
-def admin_tickets():
-    key = os.getenv("ADMIN_KEY")
-    if not key or request.args.get("key") != key:
-        return jsonify(error="Not found"), 404
-    if not os.path.exists(TICKETS):
-        return jsonify([])
-    with open(TICKETS, encoding="utf-8") as fh:
-        return jsonify(json.load(fh))
->>>>>>> dc31bff7ead649512dafebfa2281b97529237360
 
 
 @app.errorhandler(Exception)
 def on_error(e):
-<<<<<<< HEAD
-    try:
-        from werkzeug.exceptions import HTTPException  # pyright: ignore[reportMissingImports]
-    except ImportError:
-        class HTTPException(Exception):
-            code = 500
-            description = "Something went wrong on the server. Please try again."
-=======
     from werkzeug.exceptions import HTTPException
->>>>>>> dc31bff7ead649512dafebfa2281b97529237360
     if isinstance(e, HTTPException):
         return jsonify(error=e.description), e.code
     app.logger.exception("Unhandled error")
@@ -581,3 +451,4 @@ def on_error(e):
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
+

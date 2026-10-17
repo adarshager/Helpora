@@ -2,8 +2,5 @@ flask>=3.0
 requests>=2.31
 python-dotenv>=1.0
 gunicorn>=22.0
-<<<<<<< HEAD
 sqlalchemy>=2.0
 psycopg[binary]>=3.2
-=======
->>>>>>> dc31bff7ead649512dafebfa2281b97529237360
