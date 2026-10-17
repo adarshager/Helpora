@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% block head %}<meta http-equiv="refresh" content="60">{% endblock %}
+{% block body %}
+<div class="flex flex-wrap items-center justify-between gap-2 mb-5"><h1 class="text-2xl font-bold">Support tickets</h1><span class="text-sm text-slate-500">Auto-refreshes every minute</span></div>
+<div class="flex flex-wrap gap-2 mb-5">
+{% for key, lab in [("", "All"), ("open", "Open"), ("in_progress", "In progress"), ("resolved", "Resolved")] %}
+ <a href="{{ url_for('agent_home', status=key) if key else url_for('agent_home') }}" class="px-3.5 py-1.5 rounded-full text-sm font-medium border {{ 'bg-teal-600 text-white border-teal-600' if st == key else 'bg-white border-slate-200 hover:bg-slate-100' }}">{{ lab }} <span class="opacity-70">{{ total if not key else counts.get(key, 0) }}</span></a>
+{% endfor %}</div>
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+ <table class="w-full text-left text-sm min-w-[640px]"><thead class="bg-slate-50 text-slate-500"><tr><th class="px-4 py-3">Ticket</th><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Topic</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Created</th></tr></thead><tbody>
+ {% for r in rows %}<tr class="border-t border-slate-100 hover:bg-slate-50">
+  <td class="px-4 py-3 font-mono font-semibold"><a class="text-teal-700 hover:underline" href="{{ url_for('agent_ticket', tid=r['id']) }}">{{ r['id'] }}</a></td>
+  <td class="px-4 py-3">{{ r['name'] }}<div class="text-xs text-slate-500">{{ r['email'] }}</div></td>
+  <td class="px-4 py-3 max-w-xs truncate">{{ r['topic'] or 'General enquiry' }}</td>
+  <td class="px-4 py-3"><span class="px-2.5 py-1 rounded-full text-xs font-semibold {{ BADGE[r['status']] }}">{{ LABEL[r['status']] }}</span></td>
+  <td class="px-4 py-3 text-slate-500 whitespace-nowrap">{{ r['created']|fmt }}</td></tr>
+ {% else %}<tr><td colspan="5" class="px-4 py-10 text-center text-slate-500">No tickets here yet.</td></tr>{% endfor %}
+ </tbody></table></div>
+{% endblock %}

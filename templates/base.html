@@ -1,0 +1,11 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Helpora Agent Desk{% endblock %}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:['"DM Sans"','system-ui','sans-serif']}}}}</script>
+{% block head %}{% endblock %}</head>
+<body class="bg-slate-50 text-slate-800 antialiased font-sans min-h-screen">
+<header class="bg-white border-b border-slate-200"><div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+ <a href="{{ url_for('agent_home') }}" class="flex items-center gap-2.5"><span class="w-9 h-9 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold">H</span><span class="font-bold text-lg">Helpora</span><span class="hidden sm:inline px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-semibold">Agent Desk</span></a>
+ {% if session.get('agent') %}<a href="{{ url_for('agent_logout') }}" class="text-sm text-slate-600 hover:text-slate-900">Log out</a>{% endif %}</div></header>
+<main class="max-w-6xl mx-auto px-4 sm:px-6 py-6">{% block body %}{% endblock %}</main></body></html>
