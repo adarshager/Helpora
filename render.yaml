@@ -6,6 +6,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --timeout 120
     envVars:
+<<<<<<< HEAD
       - key: SECRET_KEY
         generateValue: true
       - key: AGENT_USERNAME
@@ -33,4 +34,11 @@ services:
       - key: MAIL_FROM_NAME
         value: Helpora Support
       - key: AGENT_NOTIFY_EMAIL
+=======
+      - key: GEMINI_API_KEY
+        sync: True
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ADMIN_KEY
+>>>>>>> dc31bff7ead649512dafebfa2281b97529237360
         sync: false

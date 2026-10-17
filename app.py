@@ -2,6 +2,7 @@
 Retrieval : TF-IDF style keyword scoring over knowledge_base/*.md (Q:/A: pairs)
 AI mode   : Claude or Gemini write the answer from the retrieved passages (key in .env)
 Offline   : returns the best-matching FAQ answer, no key needed
+<<<<<<< HEAD
 Escalation: unanswered questions become support tickets (database), the agent is alerted
             (Telegram/Slack/email) and works them in the /agent dashboard."""
 import os, re, json, time, math, glob, uuid, functools, hashlib, hmac, threading, importlib, sqlite3
@@ -114,11 +115,23 @@ requests = SimpleNamespace(
     post=lambda url, **kwargs: _http_request("POST", url, json_body=kwargs.pop("json", None), **kwargs),
     RequestException=_RequestException,
 )
+=======
+Escalation: unanswered questions can be sent to a human agent (support ticket)."""
+import os, re, json, time, math, glob, uuid, functools
+from datetime import datetime, timezone
+import requests
+from flask import Flask, request, jsonify, render_template
+from dotenv import load_dotenv
+>>>>>>> dc31bff7ead649512dafebfa2281b97529237360
 
 load_dotenv()
 app = Flask(__name__)
 BASE = os.path.dirname(os.path.abspath(__file__))
 COMPANY = "ShopEase"
+<<<<<<< HEAD
+=======
+TICKETS = os.getenv("TICKETS_FILE", os.path.join(BASE, "tickets.json"))
+>>>>>>> dc31bff7ead649512dafebfa2281b97529237360
 NOT_FOUND = "I couldn't find this information. Would you like me to connect you with a support agent?"
 STOP = set("a an the is are was were be been to of in on at for and or my your i me we you it its do does did can "
            "could would will how what when where which who why with this that there any about please tell want need "
@@ -329,6 +342,7 @@ def chat():
     return reply(out["answer"], out["found"], not out["found"], out["sources"], mode, err)
 
 
+<<<<<<< HEAD
 # ---------------------------------------------------------------- database, tickets and agent desk
 STATUSES = ("open", "in_progress", "resolved")
 app.jinja_env.globals.update(
@@ -402,12 +416,15 @@ def login_required(f):
     return wrapper
 
 
+=======
+>>>>>>> dc31bff7ead649512dafebfa2281b97529237360
 @app.post("/api/escalate")
 def escalate():
     j = request.get_json(silent=True) or {}
     name, email = str(j.get("name", "")).strip()[:80], str(j.get("email", "")).strip()[:120]
     if not name or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
         return jsonify(error="Please enter your name and a valid email address."), 400
+<<<<<<< HEAD
     ip = (request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.remote_addr or "?")
     if limited(ip):
         return jsonify(error="Too many requests from this network. Please try again later."), 429
@@ -513,16 +530,49 @@ def agent_reply(tid):
                        "updated=:u WHERE id=:i"), {"u": utcnow(), "i": tid})
     msg = "Reply emailed to the customer." if ok else f"Reply saved, but not emailed ({info}). Contact the customer manually."
     return redirect(url_for("agent_ticket", tid=tid, msg=msg))
+=======
+    t = {"id": "TKT-" + uuid.uuid4().hex[:6].upper(), "name": name, "email": email, "topic": str(j.get("topic", "")).strip()[:200],
+         "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+         "transcript": [{"role": str(m.get("role"))[:10], "text": str(m.get("text"))[:500]}
+                        for m in (j.get("history") or [])[-20:] if isinstance(m, dict)]}
+    try:
+        data = []
+        if os.path.exists(TICKETS):
+            with open(TICKETS, encoding="utf-8") as fh:
+                data = json.load(fh)
+        data.append(t)
+        with open(TICKETS, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=1)
+    except Exception as e:
+        app.logger.warning("Could not save ticket: %s", e)
+    return jsonify(ticket=t["id"], message=f"Thanks {name}! Your request {t['id']} has been created. "
+                                           f"A support agent will contact you at {email} within 24 hours.")
+
+
+@app.get("/admin/tickets")
+def admin_tickets():
+    key = os.getenv("ADMIN_KEY")
+    if not key or request.args.get("key") != key:
+        return jsonify(error="Not found"), 404
+    if not os.path.exists(TICKETS):
+        return jsonify([])
+    with open(TICKETS, encoding="utf-8") as fh:
+        return jsonify(json.load(fh))
+>>>>>>> dc31bff7ead649512dafebfa2281b97529237360
 
 
 @app.errorhandler(Exception)
 def on_error(e):
+<<<<<<< HEAD
     try:
         from werkzeug.exceptions import HTTPException  # pyright: ignore[reportMissingImports]
     except ImportError:
         class HTTPException(Exception):
             code = 500
             description = "Something went wrong on the server. Please try again."
+=======
+    from werkzeug.exceptions import HTTPException
+>>>>>>> dc31bff7ead649512dafebfa2281b97529237360
     if isinstance(e, HTTPException):
         return jsonify(error=e.description), e.code
     app.logger.exception("Unhandled error")

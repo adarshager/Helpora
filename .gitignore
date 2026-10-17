@@ -1,5 +1,8 @@
 .env
 .venv/
 __pycache__/
+<<<<<<< HEAD
 *.db
+=======
+>>>>>>> dc31bff7ead649512dafebfa2281b97529237360
 tickets.json
